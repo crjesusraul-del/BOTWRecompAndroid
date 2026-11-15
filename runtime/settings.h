@@ -59,7 +59,7 @@ typedef struct {
     bool cpu_boost;       // uclamp.min floor for Android threads
     bool vk_fifo; 
     bool fast_textures;   // Mali: disable anisotropic filtering + +0.5 mip LOD bias
-    bool dyn_floor_35;    // Dynamic resolution can drop to 35% instead of stopping at 50%// Vulkan present mode: false = Mailbox, true = FIFO// Android: the game's next frame overlaps the GPU's last (nvn/objects.c nvnSyncWait); on by default
+    bool dyn_floor_35;    // Dynamic resolution can drop to 35% instead of stopping at 50%    // Dynamic resolution can drop to 35% instead of stopping at 50%// Vulkan present mode: false = Mailbox, true = FIFO// Android: the game's next frame overlaps the GPU's last (nvn/objects.c nvnSyncWait); on by default
     int low_ram;          // RAM saving (vulkan/exec.c vk_low_ram): -1 automatic (devices up to 4 GB), 1 on, 0 off; read once,
                           // as the app starts
     // Driver compatibility (the start screen's Settings > Prelaunch, ui/launcher.mm; from LASRecompAndroid), for GPUs
