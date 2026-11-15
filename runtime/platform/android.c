@@ -923,7 +923,8 @@ static void uclamp_min_thread(void) {
 void plat_render_thread_pin(void) {
     const char *e = getenv("LARECOMP_RENDER_BIG");
     extern bool vk_low_ram(void);
-    if (e ? !atoi(e) : !vk_low_ram()) return;
+    extern bool vk_driver_is_mali(void);
+    if (e ? !atoi(e) : !(vk_low_ram() || vk_driver_is_mali())) return;
     long best = 0, mhz[64] = {0};
     int n = 0;
     for (int c = 0; c < 64; c++) {
