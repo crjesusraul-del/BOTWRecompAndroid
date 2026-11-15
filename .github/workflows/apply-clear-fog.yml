@@ -13,7 +13,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v5
 
-      - name: Apply Clear Fog and texture filter fixes
+      - name: Apply Mali, Clear Fog and 8GB RAM cache options
         run: |
           cat << 'EOF' > /tmp/patch_fog.py
           from pathlib import Path
@@ -29,198 +29,216 @@ jobs:
                   s = s.replace(old, new, 1)
               p.write_text(s, encoding="utf-8")
 
-          patch("runtime/nvn/vulkan/textures.c", [
-              (
-                  "    if (g_settings.fast_textures) {\n        if (mf > 1) si.mipLodBias += 0.5f;",
-                  "    if (g_settings.fast_textures) {\n        if (mf > 1 && d->max_aniso > 1) si.mipLodBias += 0.5f;",
-              ),
-          ])
-
           patch("runtime/settings.h", [
               (
-                  "    bool dyn_floor_35;",
-                  "    bool dyn_floor_35;\n    bool clear_fog;       // Reduces atmospheric fog veil on the 3D scene before HUD",
+                  "    bool clear_fog;       // Reduces atmospheric fog veil on the 3D scene before HUD",
+                  "    bool clear_fog;       // Reduces atmospheric fog veil on the 3D scene before HUD\n"
+                  "    bool half_textures;   // Load compressed world textures from mip 1 (1/4 VRAM & bandwidth)\n"
+                  "    bool no_gbuffer_split;// Do not split long G-buffer render passes on Mali\n"
+                  "    bool adpf_gpu;        // Send GPU time hints to Android ADPF (API 35+)\n"
+                  "    bool no_shadows;      // Disable dynamic shadow map comparisons for extra FPS\n"
+                  "    bool high_ram_cache;  // Use more RAM (8GB+ devices) for pipeline & buffer caches",
               ),
           ])
 
           patch("runtime/settings.c", [
               (
-                  "    .dyn_floor_35 = false,",
-                  "    .dyn_floor_35 = false,\n    .clear_fog = false,",
+                  "    .clear_fog = false,",
+                  "    .clear_fog = false,\n"
+                  "    .half_textures = false,\n"
+                  "    .no_gbuffer_split = false,\n"
+                  "    .adpf_gpu = false,\n"
+                  "    .no_shadows = false,\n"
+                  "    .high_ram_cache = false,",
               ),
               (
-                  "    g_settings.dyn_floor_35 = d->dyn_floor_35;",
-                  "    g_settings.dyn_floor_35 = d->dyn_floor_35;\n    g_settings.clear_fog = d->clear_fog;",
+                  "    g_settings.clear_fog = d->clear_fog;",
+                  "    g_settings.clear_fog = d->clear_fog;\n"
+                  "    g_settings.half_textures = d->half_textures;\n"
+                  "    g_settings.no_gbuffer_split = d->no_gbuffer_split;\n"
+                  "    g_settings.adpf_gpu = d->adpf_gpu;\n"
+                  "    g_settings.no_shadows = d->no_shadows;\n"
+                  "    g_settings.high_ram_cache = d->high_ram_cache;",
               ),
               (
-                  '        else if (!strcmp(key, "dyn_floor_35")) g_settings.dyn_floor_35 = atoi(val) != 0;',
-                  '        else if (!strcmp(key, "dyn_floor_35")) g_settings.dyn_floor_35 = atoi(val) != 0;\n        else if (!strcmp(key, "clear_fog")) g_settings.clear_fog = atoi(val) != 0;',
+                  '        else if (!strcmp(key, "clear_fog")) g_settings.clear_fog = atoi(val) != 0;',
+                  '        else if (!strcmp(key, "clear_fog")) g_settings.clear_fog = atoi(val) != 0;\n'
+                  '        else if (!strcmp(key, "half_textures")) g_settings.half_textures = atoi(val) != 0;\n'
+                  '        else if (!strcmp(key, "no_gbuffer_split")) g_settings.no_gbuffer_split = atoi(val) != 0;\n'
+                  '        else if (!strcmp(key, "adpf_gpu")) g_settings.adpf_gpu = atoi(val) != 0;\n'
+                  '        else if (!strcmp(key, "no_shadows")) g_settings.no_shadows = atoi(val) != 0;\n'
+                  '        else if (!strcmp(key, "high_ram_cache")) g_settings.high_ram_cache = atoi(val) != 0;',
               ),
               (
-                  r'    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35);',
                   r'    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\nclear_fog = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35, g_settings.clear_fog);',
+                  r'    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\nclear_fog = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35, g_settings.clear_fog);' + "\n" +
+                  r'    fprintf(f, "half_textures = %d\nno_gbuffer_split = %d\nadpf_gpu = %d\nno_shadows = %d\nhigh_ram_cache = %d\n",' + "\n" +
+                  r'            g_settings.half_textures, g_settings.no_gbuffer_split, g_settings.adpf_gpu, g_settings.no_shadows, g_settings.high_ram_cache);',
               ),
           ])
 
-          patch("runtime/nvn/vulkan/shaders.c", [
+          patch("runtime/nvn/vulkan/textures.c", [
               (
-                  '               "    color.xyz = clamp(color.xyz + deltaY, 0.0, 1.0);\\n"\n'
-                  '               "  }\\n"\n'
-                  '               "  o = vec4(color.xyz, alpha);\\n"\n'
-                  '               "}\\n";',
-                  '               "    color.xyz = clamp(color.xyz + deltaY, 0.0, 1.0);\\n"\n'
-                  '               "  }\\n"\n'
-                  '               "  if (pc.b.z > 0.5) {\\n"\n'
-                  '               "    vec3 c = color.xyz;\\n"\n'
-                  '               "    float lum = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "    float veil = 0.085 * smoothstep(0.08, 0.45, lum);\\n"\n'
-                  '               "    c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\\n"\n'
-                  '               "    c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\\n"\n'
-                  '               "    float l2 = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "    color.xyz = clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0);\\n"\n'
-                  '               "  }\\n"\n'
-                  '               "  o = vec4(color.xyz, alpha);\\n"\n'
-                  '               "}\\n";',
+                  "        static int half = -1;\n"
+                  "        if (half < 0) {\n"
+                  "            extern bool vk_low_ram(void);\n"
+                  '            const char *e = getenv("LARECOMP_HALF_TEXTURES");\n'
+                  "            half = e ? atoi(e) != 0 : vk_low_ram();\n"
+                  '            if (half) LOG("[vk] textures from their second level (half size): low RAM\\n");\n'
+                  "        }",
+                  "        static int env_half = -2;\n"
+                  "        if (env_half == -2) {\n"
+                  '            const char *e = getenv("LARECOMP_HALF_TEXTURES");\n'
+                  "            env_half = e ? (atoi(e) != 0 ? 1 : 0) : -1;\n"
+                  "        }\n"
+                  "        extern bool vk_low_ram(void);\n"
+                  "#ifdef __ANDROID__\n"
+                  "        bool half = env_half >= 0 ? env_half != 0 : (vk_low_ram() || g_settings.half_textures);\n"
+                  "#else\n"
+                  "        bool half = env_half >= 0 ? env_half != 0 : vk_low_ram();\n"
+                  "#endif\n"
+                  "        static bool logged_half = false;\n"
+                  '        if (half && !logged_half) { logged_half = true; LOG("[vk] textures from their second level (half size)\\n"); }',
               ),
               (
-                  '               "  float lobe = max(-(0.25 - 1.0 / 16.0), min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * pc.a.x * nz;\\n"\n'
-                  '               "  o = vec4((lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0), texelFetch(t, ip, 0).a);\\n"\n'
-                  '               "}\\n";\n'
-                  '    }',
-                  '               "  float lobe = max(-(0.25 - 1.0 / 16.0), min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * pc.a.x * nz;\\n"\n'
-                  '               "  vec3 c = (lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0);\\n"\n'
-                  '               "  if (pc.a.y > 0.5) {\\n"\n'
-                  '               "    float lum = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "    float veil = 0.085 * smoothstep(0.08, 0.45, lum);\\n"\n'
-                  '               "    c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\\n"\n'
-                  '               "    c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\\n"\n'
-                  '               "    float l2 = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "    c = clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0);\\n"\n'
-                  '               "  }\\n"\n'
-                  '               "  o = vec4(c, texelFetch(t, ip, 0).a);\\n"\n'
-                  '               "}\\n";\n'
-                  '    }\n'
-                  '    if (!strcmp(name, "clearfog.frag")) {\n'
-                  '        *stage = STAGE_FRAGMENT;\n'
-                  '        return "#version 450\\n"\n'
-                  '               "layout(set = 0, binding = 0) uniform sampler2D t;\\n"\n'
-                  '               "layout(push_constant) uniform P { vec4 a; vec4 b; } pc;\\n"\n'
-                  '               "layout(location = 0) out vec4 o;\\n"\n'
-                  '               "void main() {\\n"\n'
-                  '               "  ivec2 ip = clamp(ivec2(gl_FragCoord.xy), ivec2(0), ivec2(pc.a.xy) - 1);\\n"\n'
-                  '               "  vec4 px = texelFetch(t, ip, 0);\\n"\n'
-                  '               "  vec3 c = px.rgb;\\n"\n'
-                  '               "  float lum = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "  float veil = 0.085 * smoothstep(0.08, 0.45, lum);\\n"\n'
-                  '               "  c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\\n"\n'
-                  '               "  c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\\n"\n'
-                  '               "  float l2 = dot(c, vec3(0.299, 0.587, 0.114));\\n"\n'
-                  '               "  o = vec4(clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0), px.a);\\n"\n'
-                  '               "}\\n";\n'
-                  '    }',
+                  '        si.compareOp = getenv("LARECOMP_NO_SHADOW") ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);',
+                  "#ifdef __ANDROID__\n"
+                  '        bool no_sh = g_settings.no_shadows || getenv("LARECOMP_NO_SHADOW") != NULL;\n'
+                  "#else\n"
+                  '        bool no_sh = getenv("LARECOMP_NO_SHADOW") != NULL;\n'
+                  "#endif\n"
+                  "        si.compareOp = no_sh ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);",
               ),
           ])
 
           patch("runtime/nvn/vulkan/exec.c", [
               (
-                  "    if (!on || (mode != UPSCALE_FSR1 && mode != UPSCALE_SGSR1)) return;",
-                  "    bool upscale_mode = on && (mode == UPSCALE_FSR1 || mode == UPSCALE_SGSR1);\n"
-                  "    if (!upscale_mode && !g_settings.clear_fog) return;",
+                  "        plat_frame_work_gpu((uint64_t)(hint_busy * 1e6), no_gpu ? 0 : gpu, budget, (uint64_t)(game_busy * 1e6));",
+                  "        plat_frame_work_gpu((uint64_t)(hint_busy * 1e6), (!no_gpu || g_settings.adpf_gpu) ? gpu : 0, budget, (uint64_t)(game_busy * 1e6));",
               ),
               (
-                  "        if (ow <= b->width + 1 && oh <= b->height + 1) return;  // (at its size in the final image already)\n"
-                  "        VkFormatProperties fp;\n"
-                  "        vkGetPhysicalDeviceFormatProperties(g_vk.phys, b->format, &fp);\n"
-                  "        if (!(fp.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) continue;\n"
-                  "        vk_end_pass();\n"
-                  "        VkCommandBuffer cb = vk_cmd();\n"
-                  "        float iw = (float)b->width, ih = (float)b->height;\n"
-                  "        static const VkComponentMapping id = {0};\n"
-                  "        VkImageView in[3] = {vk_image_view(b, VK_IMAGE_VIEW_TYPE_2D, b->format, 0, 1, 0, 1, id, VK_IMAGE_ASPECT_COLOR_BIT)};\n"
-                  "        TexBackend *o = post_image(6, ow, oh, b->format);\n"
-                  '        gp_mark(cb, "scene upscale %ux%u -> %ux%u: %s", b->width, b->height, ow, oh, mode == UPSCALE_SGSR1 ? "sgsr1" : "easu");\n'
-                  "        if (mode == UPSCALE_SGSR1) {\n"
-                  "            float ps[8] = {1.0f / iw, 1.0f / ih, iw, ih, (float)ow, (float)oh};\n"
-                  '            post_pass(cb, "sgsr1.frag", in, 1, o, ps, false);\n'
-                  "        } else {\n"
-                  "            TexBackend *e = post_image(5, ow, oh, b->format);\n"
-                  "            float pe[8] = {iw / ow, ih / oh, 0.5f * iw / ow - 0.5f, 0.5f * ih / oh - 0.5f, iw, ih};\n"
-                  '            post_pass(cb, "easu.frag", in, 1, e, pe, false);\n'
-                  '            gp_mark(cb, "scene upscale: rcas");\n'
-                  "            float pr_[8] = {exp2f(-0.2f), 0, 0, 0, (float)ow, (float)oh};  // (sharpness 0.2 stops: AMD's default)\n"
-                  "            VkImageView ri[3] = {post_view(e)};\n"
-                  '            post_pass(cb, "rcas.frag", ri, 1, o, pr_, false);\n'
+                  "static int pipe_keep(void) {\n"
+                  "    static int keep = -1;\n"
+                  "    if (keep < 0) {\n"
+                  "        extern bool vk_low_ram(void);\n"
+                  '        const char *e = getenv("LARECOMP_PIPE_KEEP");\n'
+                  "        // (every GPU but Adreno's: an Xclipse 530 reached 8165 pipelines and 1.6 GB of malloc in an hour, an Xclipse 540\n"
+                  "        // 4375 in 10 minutes, killed for low memory - #327 #345; Turnip's cost little each)\n"
+                  "        keep = e ? atoi(e) : (g_vk.props.vendorID != 0x5143 || vk_low_ram()) ? 1500 : 0;\n"
+                  '        if (keep > 0) LOG("[vk] pipelines kept: at most %d (the least recently used ones destroyed)\\n", keep);\n'
+                  "    }\n"
+                  "    return keep;\n"
+                  "}",
+                  "static int pipe_keep(void) {\n"
+                  "    static int env_keep = -2;\n"
+                  "    if (env_keep == -2) {\n"
+                  '        const char *e = getenv("LARECOMP_PIPE_KEEP");\n'
+                  "        env_keep = e ? atoi(e) : -1;\n"
+                  "    }\n"
+                  "    if (env_keep >= 0) return env_keep;\n"
+                  "    extern bool vk_low_ram(void);\n"
+                  "#ifdef __ANDROID__\n"
+                  "    int keep = vk_low_ram() ? 1500 : g_settings.high_ram_cache ? 6000 : (g_vk.props.vendorID != 0x5143 ? 1500 : 0);\n"
+                  "#else\n"
+                  "    int keep = (g_vk.props.vendorID != 0x5143 || vk_low_ram()) ? 1500 : 0;\n"
+                  "#endif\n"
+                  "    static int logged = -1;\n"
+                  "    if (keep != logged) {\n"
+                  "        logged = keep;\n"
+                  '        if (keep > 0) LOG("[vk] pipelines kept: at most %d (the least recently used ones destroyed)\\n", keep);\n'
+                  "    }\n"
+                  "    return keep;\n"
+                  "}",
+              ),
+              (
+                  "static uint64_t vc_budget(void) {\n"
+                  "    static uint64_t b;\n"
+                  "    if (!b) {\n"
+                  '        const char *e = getenv("LARECOMP_VC_BUDGET_MB");\n'
+                  "        long total_kb = 0;\n"
+                  '        FILE *f = fopen("/proc/meminfo", "r");\n'
+                  "        if (f) {\n"
+                  '            if (fscanf(f, "MemTotal: %ld kB", &total_kb) != 1) total_kb = 0;\n'
+                  "            fclose(f);\n"
                   "        }\n"
-                  "        vk_full_barrier(cb);\n"
-                  "        scene_up.t = t;\n"
-                  "        scene_up.img = o;\n"
-                  "        scene_up.view = post_view(o);\n"
-                  "        scene_up.sx = (float)ow / (float)t->width;\n"
-                  "        scene_up.sy = (float)oh / (float)t->height;\n"
-                  "        static uint32_t lw, lh, low, loh;\n"
-                  "        static int lmode = -1;\n"
-                  "        if (b->width != lw || b->height != lh || ow != low || oh != loh || mode != lmode)\n"
-                  '            LOG("[post] scene %ux%u -> %s %ux%u (format %d)\\n", b->width, b->height, mode == UPSCALE_SGSR1 ? "sgsr1" : "fsr1",\n'
-                  "                ow, oh, b->format);\n"
-                  "        lw = b->width; lh = b->height; low = ow; loh = oh; lmode = mode;",
-                  "        bool need_up = upscale_mode && (ow > b->width + 1 || oh > b->height + 1);\n"
-                  "        if (!need_up && !g_settings.clear_fog) return;\n"
-                  "        uint32_t dw = need_up ? ow : b->width, dh = need_up ? oh : b->height;\n"
-                  "        VkFormatProperties fp;\n"
-                  "        vkGetPhysicalDeviceFormatProperties(g_vk.phys, b->format, &fp);\n"
-                  "        if (!(fp.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) continue;\n"
-                  "        vk_end_pass();\n"
-                  "        VkCommandBuffer cb = vk_cmd();\n"
-                  "        float iw = (float)b->width, ih = (float)b->height;\n"
-                  "        static const VkComponentMapping id = {0};\n"
-                  "        VkImageView in[3] = {vk_image_view(b, VK_IMAGE_VIEW_TYPE_2D, b->format, 0, 1, 0, 1, id, VK_IMAGE_ASPECT_COLOR_BIT)};\n"
-                  "        TexBackend *o = post_image(6, dw, dh, b->format);\n"
-                  '        gp_mark(cb, "scene upscale %ux%u -> %ux%u: %s", b->width, b->height, dw, dh,\n'
-                  '                !need_up ? "clearfog" : mode == UPSCALE_SGSR1 ? "sgsr1" : "easu");\n'
-                  "        if (!need_up) {\n"
-                  "            float ps[8] = {(float)dw, (float)dh};\n"
-                  '            post_pass(cb, "clearfog.frag", in, 1, o, ps, false);\n'
-                  "        } else if (mode == UPSCALE_SGSR1) {\n"
-                  "            float ps[8] = {1.0f / iw, 1.0f / ih, iw, ih, (float)dw, (float)dh, g_settings.clear_fog ? 1.0f : 0.0f};\n"
-                  '            post_pass(cb, "sgsr1.frag", in, 1, o, ps, false);\n'
-                  "        } else {\n"
-                  "            TexBackend *e = post_image(5, dw, dh, b->format);\n"
-                  "            float pe[8] = {iw / dw, ih / dh, 0.5f * iw / dw - 0.5f, 0.5f * ih / dh - 0.5f, iw, ih};\n"
-                  '            post_pass(cb, "easu.frag", in, 1, e, pe, false);\n'
-                  '            gp_mark(cb, "scene upscale: rcas");\n'
-                  "            float pr_[8] = {exp2f(-0.2f), g_settings.clear_fog ? 1.0f : 0.0f, 0, 0, (float)dw, (float)dh};\n"
-                  "            VkImageView ri[3] = {post_view(e)};\n"
-                  '            post_pass(cb, "rcas.frag", ri, 1, o, pr_, false);\n'
+                  "        b = 768ull << 20;\n"
+                  "        if (vk_low_ram() && total_kb && (uint64_t)total_kb * 1024 / 12 < b)\n"
+                  "            b = (uint64_t)total_kb * 1024 / 12;\n"
+                  "        if (e && atol(e) > 0) b = (uint64_t)atol(e) << 20;\n"
+                  '        LOG("[vk] buffer cache: up to %llu MB on the GPU\\n", (unsigned long long)(b >> 20));\n'
+                  "    }\n"
+                  "    return b;\n"
+                  "}",
+                  "static uint64_t vc_budget(void) {\n"
+                  "    static long total_kb = -1;\n"
+                  "    static long env_mb = -2;\n"
+                  "    if (env_mb == -2) {\n"
+                  '        const char *e = getenv("LARECOMP_VC_BUDGET_MB");\n'
+                  "        env_mb = (e && atol(e) > 0) ? atol(e) : 0;\n"
+                  '        FILE *f = fopen("/proc/meminfo", "r");\n'
+                  "        total_kb = 0;\n"
+                  "        if (f) {\n"
+                  '            if (fscanf(f, "MemTotal: %ld kB", &total_kb) != 1) total_kb = 0;\n'
+                  "            fclose(f);\n"
                   "        }\n"
-                  "        vk_full_barrier(cb);\n"
-                  "        scene_up.t = t;\n"
-                  "        scene_up.img = o;\n"
-                  "        scene_up.view = post_view(o);\n"
-                  "        scene_up.sx = (float)dw / (float)t->width;\n"
-                  "        scene_up.sy = (float)dh / (float)t->height;\n"
-                  "        static uint32_t lw, lh, low, loh;\n"
-                  "        static int lmode = -1;\n"
-                  "        if (b->width != lw || b->height != lh || dw != low || dh != loh || mode != lmode)\n"
-                  '            LOG("[post] scene %ux%u -> %s %ux%u (format %d)\\n", b->width, b->height,\n'
-                  '                !need_up ? "clearfog" : mode == UPSCALE_SGSR1 ? "sgsr1" : "fsr1", dw, dh, b->format);\n'
-                  "        lw = b->width; lh = b->height; low = dw; loh = dh; lmode = mode;",
+                  "    }\n"
+                  "    if (env_mb > 0) return (uint64_t)env_mb << 20;\n"
+                  "#ifdef __ANDROID__\n"
+                  "    uint64_t b = (g_settings.high_ram_cache && !vk_low_ram()) ? (1536ull << 20) : (768ull << 20);\n"
+                  "#else\n"
+                  "    uint64_t b = 768ull << 20;\n"
+                  "#endif\n"
+                  "    if (vk_low_ram() && total_kb > 0 && (uint64_t)total_kb * 1024 / 12 < b)\n"
+                  "        b = (uint64_t)total_kb * 1024 / 12;\n"
+                  "    static uint64_t logged;\n"
+                  "    if (b != logged) {\n"
+                  "        logged = b;\n"
+                  '        LOG("[vk] buffer cache: up to %llu MB on the GPU\\n", (unsigned long long)(b >> 20));\n'
+                  "    }\n"
+                  "    return b;\n"
+                  "}",
+              ),
+              (
+                  "    static long split = -1;\n"
+                  "    if (split < 0) {  // (3 ms by default; not on Qualcomm's driver, as LARECOMP_VK_CHUNK_US)\n"
+                  "        extern bool vk_driver_is_qualcomm(void);\n"
+                  '        const char *e = getenv("LARECOMP_VK_SPLIT_US");\n'
+                  "        split = e ? atol(e) : vk_driver_is_qualcomm() ? 0 : 3000;\n"
+                  "    }",
+                  "    static long split = -1;\n"
+                  "    static bool env_set = false;\n"
+                  "    if (split < 0) {  // (3 ms by default; not on Qualcomm's driver, as LARECOMP_VK_CHUNK_US)\n"
+                  "        extern bool vk_driver_is_qualcomm(void);\n"
+                  '        const char *e = getenv("LARECOMP_VK_SPLIT_US");\n'
+                  "        env_set = e != NULL;\n"
+                  "        split = e ? atol(e) : vk_driver_is_qualcomm() ? 0 : 3000;\n"
+                  "    }\n"
+                  "    if (g_settings.no_gbuffer_split && !env_set) return;",
               ),
           ])
 
           patch("runtime/ui/menu.mm", [
               (
-                  '    opt_toggle("Dynamic Res Floor 35%", &g_settings.dyn_floor_35, false,\n'
-                  '               "Allows Dynamic Internal Resolution to scale down to 35% instead of stopping at 50% in heavy areas "\n'
-                  '               "to hold 30 fps.");',
-                  '    opt_toggle("Dynamic Res Floor 35%", &g_settings.dyn_floor_35, false,\n'
-                  '               "Allows Dynamic Internal Resolution to scale down to 35% instead of stopping at 50% in heavy areas "\n'
-                  '               "to hold 30 fps.");\n'
                   '    opt_toggle("Clear Fog (No Haze)", &g_settings.clear_fog, false,\n'
                   '               "Cuts atmospheric fog veil and restores contrast on the 3D scene without affecting HUD or menus.");',
+                  '    opt_toggle("Clear Fog (No Haze)", &g_settings.clear_fog, false,\n'
+                  '               "Cuts atmospheric fog veil and restores contrast on the 3D scene without affecting HUD or menus.");\n'
+                  '    opt_toggle("Half-Size World Textures", &g_settings.half_textures, false,\n'
+                  '               "Loads compressed 3D textures at half resolution (1/4 VRAM and bandwidth on Mali) without affecting "\n'
+                  '               "terrain heightmaps or UI. Applies to new textures / on restart.");\n'
+                  '    opt_toggle("Disable G-Buffer Split (Mali)", &g_settings.no_gbuffer_split, false,\n'
+                  '               "Stops splitting long G-buffer passes every 3 ms so tile GPUs like Mali avoid extra target reloads.");\n'
+                  '    opt_toggle("ADPF GPU Boost Hint", &g_settings.adpf_gpu, false,\n'
+                  '               "Sends GPU frame timing to Android ADPF (Android 15+) to help raise Mali clocks in heavy areas.");\n'
+                  '    opt_toggle("Disable Dynamic Shadows", &g_settings.no_shadows, false,\n'
+                  '               "Skips dynamic shadow comparisons for extra FPS in heavy areas. Applies to new samplers / on restart.");\n'
+                  '    opt_toggle("Max RAM Cache (8GB+)", &g_settings.high_ram_cache, false,\n'
+                  '               "Expands GPU buffer cache (768 -> 1536 MB) and kept Mali pipelines (1500 -> 6000) to use more free "\n'
+                  '               "RAM and reduce stutters on 8GB+ phones. Ignored if RAM saving is On.");',
               ),
           ])
 
-          print("All 6 files patched cleanly.")
+          print("All 5 new options patched cleanly.")
           EOF
           python3 /tmp/patch_fog.py
 
@@ -229,8 +247,8 @@ jobs:
           if [ -n "$(git status --porcelain)" ]; then
             git config user.name "github-actions[bot]"
             git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git add runtime/nvn/vulkan/textures.c runtime/settings.h runtime/settings.c runtime/nvn/vulkan/shaders.c runtime/nvn/vulkan/exec.c runtime/ui/menu.mm
-            git commit -m "Fix fast_textures and add Clear Fog toggle"
+            git add runtime/settings.h runtime/settings.c runtime/nvn/vulkan/textures.c runtime/nvn/vulkan/exec.c runtime/ui/menu.mm
+            git commit -m "Add Mali optimization toggles and 8GB RAM cache option"
             git push
           else
             echo "No changes needed."
