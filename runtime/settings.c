@@ -60,7 +60,7 @@ Settings g_settings = {
     .gpu_heap = -1,
     .low_ram = -1,
     .inplace_reads = -1,
-    .turnip_lrz = -1,
+    .turnip_lrz = -0,
     .event_fps_unlock = false,  // (some events count frames: hle/framepace.c in_event)
     .fps_mode = 1,  // (30: the game's own choice dropped the overworld to 20, where the GPU's clocks settled low)
     .thermal_cap = true,  // (hle/framepace.c: 60 / 45 fps drop to 30 while the phone is too hot)
@@ -73,6 +73,9 @@ Settings g_settings = {
     .upscaler = UPSCALE_SGSR1,  // (one pass: ~1 ms on the Adreno 830 to 2560x1440, FSR 1's two ~2.7 ms; 40 fps against 38)
     .native_code = false,       // (an experiment: runtime/native.c)
     .sync_lag = true,           // (a few more fps; the CPU's reads of GPU results a frame old: nvn/objects.c nvnSyncWait)
+    .handheld_mode = false,
+    .cpu_boost = false,
+    .vk_fifo = false,
     .out_lines = OUT_AUTO,      // (POCO F7 Ultra, 3200x1440, 1.8.2's Great Plateau: GPU 22.8 ms a frame at the screen's,
                                 // 18.6 at 1080 lines with a larger scene - the final image's passes over 2.2x the pixels)
 #else
@@ -237,6 +240,9 @@ void settings_reset_defaults(void) {
     g_settings.thermal_cap = d->thermal_cap;
     g_settings.shader_int32 = d->shader_int32;
     g_settings.sync_lag = d->sync_lag;
+    g_settings.handheld_mode = d->handheld_mode;
+    g_settings.cpu_boost = d->cpu_boost;
+    g_settings.vk_fifo = d->vk_fifo;
     g_settings.low_ram = d->low_ram;
     g_settings.native_code = d->native_code;
     g_settings.files_in_place = d->files_in_place;
@@ -291,6 +297,9 @@ void settings_load(void) {
         else if (!strcmp(key, "frame_rate")) g_settings.fps_mode = !strcmp(val, "30") ? 1 : !strcmp(val, "60") ? 2 : !strcmp(val, "20") ? 3 : !strcmp(val, "45") ? 4 : 0;
         else if (!strcmp(key, "shader_int32")) g_settings.shader_int32 = atoi(val) != 0;
         else if (!strcmp(key, "sync_lag")) g_settings.sync_lag = atoi(val) != 0;
+        else if (!strcmp(key, "handheld_mode")) g_settings.handheld_mode = atoi(val) != 0;
+        else if (!strcmp(key, "cpu_boost")) g_settings.cpu_boost = atoi(val) != 0;
+        else if (!strcmp(key, "vk_fifo")) g_settings.vk_fifo = atoi(val) != 0;    
         else if (!strcmp(key, "native_code")) g_settings.native_code = atoi(val) != 0;
         else if (!strcmp(key, "files_in_place")) g_settings.files_in_place = atoi(val) != 0;
         else if (!strcmp(key, "gpu_heap")) g_settings.gpu_heap = !strcmp(val, "auto") ? -1 : atoi(val) != 0;
@@ -410,6 +419,8 @@ void settings_save(void) {
             g_settings.sync_lag, g_settings.native_code, g_settings.files_in_place);
     static const char *const tri[] = {"auto", "0", "1"};  // (-1 / 0 / 1)
 #define TRI(v) tri[(v) < 0 ? 0 : (v) ? 2 : 1]
+    fprintf(f, "handheld_mode = %d\ncpu_boost = %d\nvk_fifo = %d\n", g_settings.handheld_mode,
+            g_settings.cpu_boost, g_settings.vk_fifo);
     fprintf(f, "gpu_heap = %s\ninplace_reads = %s\nturnip_lrz = %s\nlog_file = %d\ngpu_model = %s\n", TRI(g_settings.gpu_heap),
             TRI(g_settings.inplace_reads), TRI(g_settings.turnip_lrz), g_settings.log_file, g_settings.gpu_model);
     fprintf(f, "driver_env = %s\nheap_file = %d\n", g_settings.driver_env, g_settings.heap_file);
