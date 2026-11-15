@@ -52,9 +52,13 @@ static uint32_t new_signaled_event(void) {
 #define UNHANDLED(iface) LOG("[am] %s cmd %u (unhandled, ok)\n", iface, req->cmd)
 
 static int am_handheld(void) {
-    static int v = -1;
-    if (v < 0) v = getenv("LARECOMP_HANDHELD") && atoi(getenv("LARECOMP_HANDHELD"));
-    return v;
+    const char *e = getenv("LARECOMP_HANDHELD");
+    if (e) return atoi(e) != 0;
+#ifdef __ANDROID__
+    return g_settings.handheld_mode ? 1 : 0;
+#else
+    return 0;
+#endif
 }
 
 static void common_state_getter(Service *s, IpcReq *req, IpcResp *resp) {
