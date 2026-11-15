@@ -2133,6 +2133,20 @@ void ui_window_init(void) {
     create_device();
 #ifdef __ANDROID__
     if (strcmp(g_settings.gpu_model, g_vk.props.deviceName)) {  // (for turnip_lrz's Automatic at the next start)
+        bool first_gpu_init = !g_settings.gpu_model[0];
+        if (first_gpu_init && vk_driver_is_mali()) {
+            g_settings.gpu_heap = 0;
+            g_settings.inplace_reads = 0;
+            g_settings.turnip_lrz = 0;
+            g_settings.fps_mode = 1;            // 30 fps estables
+            g_settings.thermal_cap = true;
+            g_settings.res_mode = RES_Q50;      // ~540p internos (puedes subir a RES_Q75 en el menú)
+            g_settings.upscaler = UPSCALE_SGSR1;
+            g_settings.antialias = AA_OFF;
+            g_settings.out_lines = 720;         // evita saturar la GPU a 144 Hz
+            g_settings.sync_lag = true;
+            LOG("[vk] Mali GPU detected (%s): applied Edge 40 Neo / Valhall defaults\n", g_vk.props.deviceName);
+        }
         snprintf(g_settings.gpu_model, sizeof g_settings.gpu_model, "%s", g_vk.props.deviceName);
         settings_save();
     }
@@ -2207,6 +2221,16 @@ bool vk_driver_is_radv(void) {
         r = d.driverID == VK_DRIVER_ID_MESA_RADV;
     }
     return r > 0;
+}
+bool vk_driver_is_mali(void) {
+    static int m = -1;
+    if (m < 0 && g_vk.phys) {
+        VkPhysicalDeviceDriverProperties d = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DRIVER_PROPERTIES};
+        VkPhysicalDeviceProperties2 p = {.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2, .pNext = &d};
+        vkGetPhysicalDeviceProperties2(g_vk.phys, &p);
+        m = (d.driverID == VK_DRIVER_ID_ARM_PROPRIETARY || g_vk.props.vendorID == 0x13B5);
+    }
+    return m > 0;
 }
 #endif
 
