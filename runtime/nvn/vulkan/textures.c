@@ -536,13 +536,19 @@ static void create_image(NvnTexture *t, TexBackend *b) {
     {   // Low RAM (exec.c vk_low_ram, or LARECOMP_HALF_TEXTURES=1 / 0): a mipmapped texture the game only samples starts
         // at its second level - a quarter of the memory. A 4 GB tablet ran out of memory loading the world with 330 MB
         // of textures on the GPU (Galaxy Tab A9+, 2026-11-08). Not render targets, linear or small ones.
-        static int half = -1;
-        if (half < 0) {
-            extern bool vk_low_ram(void);
+        static int env_half = -2;
+        if (env_half == -2) {
             const char *e = getenv("LARECOMP_HALF_TEXTURES");
-            half = e ? atoi(e) != 0 : vk_low_ram();
-            if (half) LOG("[vk] textures from their second level (half size): low RAM\n");
+            env_half = e ? (atoi(e) != 0 ? 1 : 0) : -1;
         }
+        extern bool vk_low_ram(void);
+#ifdef __ANDROID__
+        bool half = env_half >= 0 ? env_half != 0 : (vk_low_ram() || g_settings.half_textures);
+#else
+        bool half = env_half >= 0 ? env_half != 0 : vk_low_ram();
+#endif
+        static bool logged_half = false;
+        if (half && !logged_half) { logged_half = true; LOG("[vk] textures from their second level (half size)\n"); }
         b->skip = 0;
         // Only block-compressed ones (BC / ASTC: colours, materials, most of the memory): an uncompressed one may be data
         // a shader reads texel by texel - the terrain's heights (R16, 1024x1024x8) at half size left the ground around
@@ -1877,7 +1883,12 @@ static VkSampler make_sampler(const NvnSamplerDesc *d, bool compare) {
     if (stest && mf > 1) { si.minLod = 0; si.maxLod = VK_LOD_CLAMP_NONE; si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = 16; }
     if (d->compare_mode && compare) {
         si.compareEnable = VK_TRUE;
-        si.compareOp = getenv("LARECOMP_NO_SHADOW") ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
+#ifdef __ANDROID__
+        bool no_sh = g_settings.no_shadows || getenv("LARECOMP_NO_SHADOW") != NULL;
+#else
+        bool no_sh = getenv("LARECOMP_NO_SHADOW") != NULL;
+#endif
+        si.compareOp = no_sh ? VK_COMPARE_OP_ALWAYS : compare_op(d->compare_func);
     }
     VkSamplerCustomBorderColorCreateInfoEXT cb = {.sType = VK_STRUCTURE_TYPE_SAMPLER_CUSTOM_BORDER_COLOR_CREATE_INFO_EXT};
     if (border) {

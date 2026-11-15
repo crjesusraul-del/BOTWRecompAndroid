@@ -79,6 +79,11 @@ Settings g_settings = {
     .fast_textures = false,
     .dyn_floor_35 = false,
     .clear_fog = false,
+    .half_textures = false,
+    .no_gbuffer_split = false,
+    .adpf_gpu = false,
+    .no_shadows = false,
+    .high_ram_cache = false,
     .out_lines = OUT_AUTO,      // (POCO F7 Ultra, 3200x1440, 1.8.2's Great Plateau: GPU 22.8 ms a frame at the screen's,
                                 // 18.6 at 1080 lines with a larger scene - the final image's passes over 2.2x the pixels)
 #else
@@ -249,6 +254,11 @@ void settings_reset_defaults(void) {
     g_settings.fast_textures = d->fast_textures;
     g_settings.dyn_floor_35 = d->dyn_floor_35;
     g_settings.clear_fog = d->clear_fog;
+    g_settings.half_textures = d->half_textures;
+    g_settings.no_gbuffer_split = d->no_gbuffer_split;
+    g_settings.adpf_gpu = d->adpf_gpu;
+    g_settings.no_shadows = d->no_shadows;
+    g_settings.high_ram_cache = d->high_ram_cache;
     g_settings.low_ram = d->low_ram;
     g_settings.native_code = d->native_code;
     g_settings.files_in_place = d->files_in_place;
@@ -309,6 +319,11 @@ void settings_load(void) {
         else if (!strcmp(key, "fast_textures")) g_settings.fast_textures = atoi(val) != 0;
         else if (!strcmp(key, "dyn_floor_35")) g_settings.dyn_floor_35 = atoi(val) != 0;
         else if (!strcmp(key, "clear_fog")) g_settings.clear_fog = atoi(val) != 0;
+        else if (!strcmp(key, "half_textures")) g_settings.half_textures = atoi(val) != 0;
+        else if (!strcmp(key, "no_gbuffer_split")) g_settings.no_gbuffer_split = atoi(val) != 0;
+        else if (!strcmp(key, "adpf_gpu")) g_settings.adpf_gpu = atoi(val) != 0;
+        else if (!strcmp(key, "no_shadows")) g_settings.no_shadows = atoi(val) != 0;
+        else if (!strcmp(key, "high_ram_cache")) g_settings.high_ram_cache = atoi(val) != 0;
         else if (!strcmp(key, "native_code")) g_settings.native_code = atoi(val) != 0;
         else if (!strcmp(key, "files_in_place")) g_settings.files_in_place = atoi(val) != 0;
         else if (!strcmp(key, "gpu_heap")) g_settings.gpu_heap = !strcmp(val, "auto") ? -1 : atoi(val) != 0;
@@ -431,6 +446,8 @@ void settings_save(void) {
     fprintf(f, "handheld_mode = %d\ncpu_boost = %d\nvk_fifo = %d\n", g_settings.handheld_mode,
             g_settings.cpu_boost, g_settings.vk_fifo);
     fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\nclear_fog = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35, g_settings.clear_fog);
+    fprintf(f, "half_textures = %d\nno_gbuffer_split = %d\nadpf_gpu = %d\nno_shadows = %d\nhigh_ram_cache = %d\n",
+            g_settings.half_textures, g_settings.no_gbuffer_split, g_settings.adpf_gpu, g_settings.no_shadows, g_settings.high_ram_cache);
     fprintf(f, "gpu_heap = %s\ninplace_reads = %s\nturnip_lrz = %s\nlog_file = %d\ngpu_model = %s\n", TRI(g_settings.gpu_heap),
             TRI(g_settings.inplace_reads), TRI(g_settings.turnip_lrz), g_settings.log_file, g_settings.gpu_model);
     fprintf(f, "driver_env = %s\nheap_file = %d\n", g_settings.driver_env, g_settings.heap_file);

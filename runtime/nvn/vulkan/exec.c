@@ -518,7 +518,7 @@ void vk_pace_frame(void) {
         static double budget30 = -1;  // (LARECOMP_ADPF30_MS=<ms>, a test: the 30 fps budget instead of 25 ms)
         if (budget30 < 0) budget30 = getenv("LARECOMP_ADPF30_MS") ? atof(getenv("LARECOMP_ADPF30_MS")) : 0;
         if (budget30 > 0 && budget == 25000000ull) budget = (uint64_t)(budget30 * 1e6);
-        plat_frame_work_gpu((uint64_t)(hint_busy * 1e6), no_gpu ? 0 : gpu, budget, (uint64_t)(game_busy * 1e6));
+        plat_frame_work_gpu((uint64_t)(hint_busy * 1e6), (!no_gpu || g_settings.adpf_gpu) ? gpu : 0, budget, (uint64_t)(game_busy * 1e6));
     }
 #endif
 #ifdef __ANDROID__
@@ -3259,13 +3259,21 @@ static Pipe *last_pipeline;  // (draw_'s: the previous draw's, reused when nothi
 // "fps drops after a while" reports). One unused for 30 s goes; built again (from the pipeline cache) at its next
 // use, its draws skipped meanwhile as for a new one. LARECOMP_PIPE_KEEP=<n> (0: never).
 static int pipe_keep(void) {
-    static int keep = -1;
-    if (keep < 0) {
-        extern bool vk_low_ram(void);
+    static int env_keep = -2;
+    if (env_keep == -2) {
         const char *e = getenv("LARECOMP_PIPE_KEEP");
-        // (every GPU but Adreno's: an Xclipse 530 reached 8165 pipelines and 1.6 GB of malloc in an hour, an Xclipse 540
-        // 4375 in 10 minutes, killed for low memory - #327 #345; Turnip's cost little each)
-        keep = e ? atoi(e) : (g_vk.props.vendorID != 0x5143 || vk_low_ram()) ? 1500 : 0;
+        env_keep = e ? atoi(e) : -1;
+    }
+    if (env_keep >= 0) return env_keep;
+    extern bool vk_low_ram(void);
+#ifdef __ANDROID__
+    int keep = vk_low_ram() ? 1500 : g_settings.high_ram_cache ? 6000 : (g_vk.props.vendorID != 0x5143 ? 1500 : 0);
+#else
+    int keep = (g_vk.props.vendorID != 0x5143 || vk_low_ram()) ? 1500 : 0;
+#endif
+    static int logged = -1;
+    if (keep != logged) {
+        logged = keep;
         if (keep > 0) LOG("[vk] pipelines kept: at most %d (the least recently used ones destroyed)\n", keep);
     }
     return keep;
@@ -5689,19 +5697,29 @@ static void gcopy_prepare(unsigned stage_mask, bool store) {
 // 4 GB low-RAM path (~280 MB on a Galaxy Tab A9+ reporting 3.4 GB, 2026-11-08).
 // LARECOMP_VC_BUDGET_MB=<n>: that many.
 static uint64_t vc_budget(void) {
-    static uint64_t b;
-    if (!b) {
+    static long total_kb = -1;
+    static long env_mb = -2;
+    if (env_mb == -2) {
         const char *e = getenv("LARECOMP_VC_BUDGET_MB");
-        long total_kb = 0;
+        env_mb = (e && atol(e) > 0) ? atol(e) : 0;
         FILE *f = fopen("/proc/meminfo", "r");
+        total_kb = 0;
         if (f) {
             if (fscanf(f, "MemTotal: %ld kB", &total_kb) != 1) total_kb = 0;
             fclose(f);
         }
-        b = 768ull << 20;
-        if (vk_low_ram() && total_kb && (uint64_t)total_kb * 1024 / 12 < b)
-            b = (uint64_t)total_kb * 1024 / 12;
-        if (e && atol(e) > 0) b = (uint64_t)atol(e) << 20;
+    }
+    if (env_mb > 0) return (uint64_t)env_mb << 20;
+#ifdef __ANDROID__
+    uint64_t b = (g_settings.high_ram_cache && !vk_low_ram()) ? (1536ull << 20) : (768ull << 20);
+#else
+    uint64_t b = 768ull << 20;
+#endif
+    if (vk_low_ram() && total_kb > 0 && (uint64_t)total_kb * 1024 / 12 < b)
+        b = (uint64_t)total_kb * 1024 / 12;
+    static uint64_t logged;
+    if (b != logged) {
+        logged = b;
         LOG("[vk] buffer cache: up to %llu MB on the GPU\n", (unsigned long long)(b >> 20));
     }
     return b;
@@ -8352,11 +8370,14 @@ int vk_ab(const char *what) {
 static void split_long_pass(void) {
 #ifdef __ANDROID__
     static long split = -1;
+    static bool env_set = false;
     if (split < 0) {  // (3 ms by default; not on Qualcomm's driver, as LARECOMP_VK_CHUNK_US)
         extern bool vk_driver_is_qualcomm(void);
         const char *e = getenv("LARECOMP_VK_SPLIT_US");
+        env_set = e != NULL;
         split = e ? atol(e) : vk_driver_is_qualcomm() ? 0 : 3000;
     }
+    if (g_settings.no_gbuffer_split && !env_set) return;
     extern bool vk_async_on(void);
     static unsigned n;  // (the clock every 32 draws: a clock read per draw showed up in the profile)
     if (split > 0 && in_pass && !(++n & 31) && AB("split") != 1 && vk_async_on() && last_submit_ns &&

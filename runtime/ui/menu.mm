@@ -784,6 +784,18 @@ static void tab_display(void) {
                "to hold 30 fps.");
     opt_toggle("Clear Fog (No Haze)", &g_settings.clear_fog, false,
                "Cuts atmospheric fog veil and restores contrast on the 3D scene without affecting HUD or menus.");
+    opt_toggle("Half-Size World Textures", &g_settings.half_textures, false,
+               "Loads compressed 3D textures at half resolution (1/4 VRAM and bandwidth on Mali) without affecting "
+               "terrain heightmaps or UI. Applies to new textures / on restart.");
+    opt_toggle("Disable G-Buffer Split (Mali)", &g_settings.no_gbuffer_split, false,
+               "Stops splitting long G-buffer passes every 3 ms so tile GPUs like Mali avoid extra target reloads.");
+    opt_toggle("ADPF GPU Boost Hint", &g_settings.adpf_gpu, false,
+               "Sends GPU frame timing to Android ADPF (Android 15+) to help raise Mali clocks in heavy areas.");
+    opt_toggle("Disable Dynamic Shadows", &g_settings.no_shadows, false,
+               "Skips dynamic shadow comparisons for extra FPS in heavy areas. Applies to new samplers / on restart.");
+    opt_toggle("Max RAM Cache (8GB+)", &g_settings.high_ram_cache, false,
+               "Expands GPU buffer cache (768 -> 1536 MB) and kept Mali pipelines (1500 -> 6000) to use more free "
+               "RAM and reduce stutters on 8GB+ phones. Ignored if RAM saving is On.");
     {   // RAM saving (vulkan/exec.c vk_low_ram): read once as the app starts
         void launcher_restart_app(void);  // (ui/launcher.mm)
         static const char *ram[] = {"Automatic", "On", "Off"};  // display order -> low_ram -1 / 1 / 0

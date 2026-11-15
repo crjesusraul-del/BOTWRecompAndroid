@@ -60,7 +60,12 @@ typedef struct {
     bool vk_fifo; 
     bool fast_textures;   // Mali: disable anisotropic filtering + +0.5 mip LOD bias
     bool dyn_floor_35;
-    bool clear_fog;       // Reduces atmospheric fog veil on the 3D scene before HUD    // Dynamic resolution can drop to 35% instead of stopping at 50%    // Dynamic resolution can drop to 35% instead of stopping at 50%// Vulkan present mode: false = Mailbox, true = FIFO// Android: the game's next frame overlaps the GPU's last (nvn/objects.c nvnSyncWait); on by default
+    bool clear_fog;       // Reduces atmospheric fog veil on the 3D scene before HUD
+    bool half_textures;   // Load compressed world textures from mip 1 (1/4 VRAM & bandwidth)
+    bool no_gbuffer_split;// Do not split long G-buffer render passes on Mali
+    bool adpf_gpu;        // Send GPU time hints to Android ADPF (API 35+)
+    bool no_shadows;      // Disable dynamic shadow map comparisons for extra FPS
+    bool high_ram_cache;  // Use more RAM (8GB+ devices) for pipeline & buffer caches    // Dynamic resolution can drop to 35% instead of stopping at 50%    // Dynamic resolution can drop to 35% instead of stopping at 50%// Vulkan present mode: false = Mailbox, true = FIFO// Android: the game's next frame overlaps the GPU's last (nvn/objects.c nvnSyncWait); on by default
     int low_ram;          // RAM saving (vulkan/exec.c vk_low_ram): -1 automatic (devices up to 4 GB), 1 on, 0 off; read once,
                           // as the app starts
     // Driver compatibility (the start screen's Settings > Prelaunch, ui/launcher.mm; from LASRecompAndroid), for GPUs
