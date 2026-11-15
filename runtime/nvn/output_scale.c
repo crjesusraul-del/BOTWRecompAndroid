@@ -54,7 +54,12 @@ static void dyn_update(double now, double gpu_ms) {
     bool slow = avg_gpu >= 0 ? avg_gpu > want * 0.87 || (avg_dt > want * 1.08 && avg_gpu > want * 0.7)
                              : avg_dt > want * 1.04;
     if (slow) {
-        g_dyn = fmax(0.5, g_dyn - (avg_dt > want * 1.3 ? 0.1 : 0.05));
+#ifdef __ANDROID__
+        double floor_scale = g_settings.dyn_floor_35 ? 0.35 : 0.5;
+#else
+        double floor_scale = 0.5;
+#endif
+        g_dyn = fmax(floor_scale, g_dyn - (avg_dt > want * 1.3 ? 0.1 : 0.05));
         g_dyn_good = 0;
         if (now - g_dyn_last_raise < 3.0) g_dyn_probe_wait = fmin(g_dyn_probe_wait * 2, 60.0);  // raised too eagerly
     } else if (g_dyn < 1.0) {
