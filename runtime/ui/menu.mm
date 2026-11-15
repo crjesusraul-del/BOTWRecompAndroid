@@ -767,6 +767,15 @@ static void tab_display(void) {
                "Translates the game's shaders with 32-bit address math, the path used for drivers without 64-bit "
                "integers (Adreno 6xx / 7xx and Mali stock drivers). Try it if lighting, grass or text are missing or wrong "
                "on your GPU. Applies to shaders translated from now on: restart the app for all of them.");
+   opt_toggle("Switch Handheld (720p)", &g_settings.handheld_mode, false,
+               "Runs the game in Switch Handheld mode (1280x720 instead of 1600x900 Docked) with lighter shadows "
+               "and LODs. Faster on Mali GPUs. Applies when the game starts.");
+    opt_toggle("CPU Boost (uclamp)", &g_settings.cpu_boost, false,
+               "Requests a minimum 75% clock floor for game and render threads so Cortex-A78 cores do not drop "
+               "frequency in open areas. Uses more battery. Applies to new threads / on restart.");
+    opt_toggle("Vulkan VSync (FIFO)", &g_settings.vk_fifo, false,
+               "Off (Mailbox): fastest frame delivery without tearing. On (FIFO): strict VSync queue. "
+               "Applies when the app restarts.");
     {   // RAM saving (vulkan/exec.c vk_low_ram): read once as the app starts
         void launcher_restart_app(void);  // (ui/launcher.mm)
         static const char *ram[] = {"Automatic", "On", "Off"};  // display order -> low_ram -1 / 1 / 0
