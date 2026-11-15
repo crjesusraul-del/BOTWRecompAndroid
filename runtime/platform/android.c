@@ -32,6 +32,7 @@
 #include "../paths.h"
 #include "../platform.h"
 #include "../rt.h"
+#include "../settings.h"
 #include "../../android/common/guest_window.h"
 
 uint64_t g_guest_lo;  // the window's start (rt.h GUEST_LO), set by plat_reserve_guest before main()
@@ -895,12 +896,11 @@ static bool g_pinned;
 // sched_setattr with SCHED_FLAG_UTIL_CLAMP_MIN keeps the policy and priority; whether Android allows it (seccomp,
 // SELinux, the cgroup's uclamp.max) goes to the log once.
 static void uclamp_min_thread(void) {
-    static int want = -1;
-    if (want < 0) {
-        const char *e = getenv("LARECOMP_UCLAMP_MIN");
-        want = e && atoi(e) > 0 ? (atoi(e) > 1024 ? 1024 : atoi(e)) : 0;
-    }
-    if (!want) return;
+    const char *e = getenv("LARECOMP_UCLAMP_MIN");
+    int want = e ? atoi(e) : (g_settings.cpu_boost ? 768 : 0);
+    if (want > 1024) want = 1024;
+    if (want <= 0) return;
+    
     struct {
         uint32_t size, policy;
         uint64_t flags;
