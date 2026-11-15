@@ -245,6 +245,8 @@ void settings_reset_defaults(void) {
     g_settings.handheld_mode = d->handheld_mode;
     g_settings.cpu_boost = d->cpu_boost;
     g_settings.vk_fifo = d->vk_fifo;
+    g_settings.fast_textures = d->fast_textures;
+    g_settings.dyn_floor_35 = d->dyn_floor_35;
     g_settings.low_ram = d->low_ram;
     g_settings.native_code = d->native_code;
     g_settings.files_in_place = d->files_in_place;
@@ -302,6 +304,8 @@ void settings_load(void) {
         else if (!strcmp(key, "handheld_mode")) g_settings.handheld_mode = atoi(val) != 0;
         else if (!strcmp(key, "cpu_boost")) g_settings.cpu_boost = atoi(val) != 0;
         else if (!strcmp(key, "vk_fifo")) g_settings.vk_fifo = atoi(val) != 0;    
+        else if (!strcmp(key, "fast_textures")) g_settings.fast_textures = atoi(val) != 0;
+        else if (!strcmp(key, "dyn_floor_35")) g_settings.dyn_floor_35 = atoi(val) != 0;
         else if (!strcmp(key, "native_code")) g_settings.native_code = atoi(val) != 0;
         else if (!strcmp(key, "files_in_place")) g_settings.files_in_place = atoi(val) != 0;
         else if (!strcmp(key, "gpu_heap")) g_settings.gpu_heap = !strcmp(val, "auto") ? -1 : atoi(val) != 0;
@@ -423,6 +427,7 @@ void settings_save(void) {
 #define TRI(v) tri[(v) < 0 ? 0 : (v) ? 2 : 1]
     fprintf(f, "handheld_mode = %d\ncpu_boost = %d\nvk_fifo = %d\n", g_settings.handheld_mode,
             g_settings.cpu_boost, g_settings.vk_fifo);
+    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35);
     fprintf(f, "gpu_heap = %s\ninplace_reads = %s\nturnip_lrz = %s\nlog_file = %d\ngpu_model = %s\n", TRI(g_settings.gpu_heap),
             TRI(g_settings.inplace_reads), TRI(g_settings.turnip_lrz), g_settings.log_file, g_settings.gpu_model);
     fprintf(f, "driver_env = %s\nheap_file = %d\n", g_settings.driver_env, g_settings.heap_file);
