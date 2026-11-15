@@ -76,6 +76,8 @@ Settings g_settings = {
     .handheld_mode = false,
     .cpu_boost = false,
     .vk_fifo = false,
+    .fast_textures = false,
+    .dyn_floor_35 = false,
     .out_lines = OUT_AUTO,      // (POCO F7 Ultra, 3200x1440, 1.8.2's Great Plateau: GPU 22.8 ms a frame at the screen's,
                                 // 18.6 at 1080 lines with a larger scene - the final image's passes over 2.2x the pixels)
 #else
