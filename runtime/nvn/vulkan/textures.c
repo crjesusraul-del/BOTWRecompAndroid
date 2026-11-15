@@ -14,6 +14,7 @@
 #include "../astc.h"
 #include "../renderer.h"
 #include "../texpatch.h"
+#include "../../settings.h"
 
 // ================================================================== formats
 typedef struct { VkFormat vf; uint8_t expand_rgb, alpha_one; } VkFmt;
@@ -1858,7 +1859,16 @@ static VkSampler make_sampler(const NvnSamplerDesc *d, bool compare) {
     if (mf <= 1) si.maxLod = si.minLod + 0.25f;  // not mipmapped: stay on the base level
     if (si.maxLod < si.minLod) si.maxLod = si.minLod;
     si.mipLodBias = d->lod_bias;
+#ifdef __ANDROID__
+    if (g_settings.fast_textures) {
+        if (mf > 1) si.mipLodBias += 0.5f;
+    } else if (d->max_aniso > 1) {
+        si.anisotropyEnable = VK_TRUE;
+        si.maxAnisotropy = fminf(d->max_aniso, 16);
+    }
+#else
     if (d->max_aniso > 1) { si.anisotropyEnable = VK_TRUE; si.maxAnisotropy = fminf(d->max_aniso, 16); }
+#endif
     static float lodmin = -1;
     if (lodmin < 0) lodmin = getenv("LARECOMP_LOD_MIN") ? (float)atof(getenv("LARECOMP_LOD_MIN")) : 0;
     if (lodmin > 0 && mf > 1) si.minLod = fmaxf(si.minLod, lodmin);
