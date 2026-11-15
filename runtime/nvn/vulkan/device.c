@@ -984,8 +984,13 @@ static VkPresentModeKHR present_mode(void) {
     // a throttled / captured / busy compositor slowed the whole game (4-21 fps with the GPU mostly idle; mailbox:
     // 60). No tearing. LARECOMP_VK_PRESENT=fifo|immediate|mailbox to choose.
     const char *e = getenv("LARECOMP_VK_PRESENT");
-    VkPresentModeKHR want = !e || !strcmp(e, "mailbox") ? VK_PRESENT_MODE_MAILBOX_KHR
-                          : !strcmp(e, "immediate") ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR;
+    VkPresentModeKHR want = e ? (!strcmp(e, "mailbox") ? VK_PRESENT_MODE_MAILBOX_KHR
+                               : !strcmp(e, "immediate") ? VK_PRESENT_MODE_IMMEDIATE_KHR : VK_PRESENT_MODE_FIFO_KHR)
+#ifdef __ANDROID__
+                              : (g_settings.vk_fifo ? VK_PRESENT_MODE_FIFO_KHR : VK_PRESENT_MODE_MAILBOX_KHR);
+#else
+                              : VK_PRESENT_MODE_MAILBOX_KHR;
+#endif
     uint32_t n = 0;
     vkGetPhysicalDeviceSurfacePresentModesKHR(g_vk.phys, g_vk.surface, &n, NULL);
     VkPresentModeKHR m[16];
