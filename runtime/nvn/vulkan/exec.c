@@ -8154,7 +8154,8 @@ static void scene_upscale(Prog *pr, CmdRec *r) {
     int mode = g_settings.upscaler;
     extern int vk_ab(const char *what);
     if (AB("sgsr") == 1) mode = UPSCALE_SGSR1;
-    if (!on || (mode != UPSCALE_FSR1 && mode != UPSCALE_SGSR1)) return;
+    bool upscale_mode = on && (mode == UPSCALE_FSR1 || mode == UPSCALE_SGSR1);
+    if (!upscale_mode && !g_settings.clear_fog) return;
     NvnTexture *rt = st.rt.ncolor ? st.rt.color[0] : NULL;
     if (!rt || r->x[2] > 6 || !pr->fi->ntex || vk_texture_scale_group(rt) != RS_OUT) return;
     const float *vp = st.viewport[0];
@@ -8170,7 +8171,9 @@ static void scene_upscale(Prog *pr, CmdRec *r) {
         if (!t || t->target != 1 || vk_texture_scale_group(t) != RS_SCENE || t->width * 2 < vp[2] || t->height * 2 < vp[3]) continue;
         TexBackend *b = vk_tex(t, false);
         if (!b->image || b->layers != 1 || b->samples != 1 || b->depth != 1 || (b->aspect & ~VK_IMAGE_ASPECT_COLOR_BIT)) continue;
-        if (ow <= b->width + 1 && oh <= b->height + 1) return;  // (at its size in the final image already)
+        bool need_up = upscale_mode && (ow > b->width + 1 || oh > b->height + 1);
+        if (!need_up && !g_settings.clear_fog) return;
+        uint32_t dw = need_up ? ow : b->width, dh = need_up ? oh : b->height;
         VkFormatProperties fp;
         vkGetPhysicalDeviceFormatProperties(g_vk.phys, b->format, &fp);
         if (!(fp.optimalTilingFeatures & VK_FORMAT_FEATURE_COLOR_ATTACHMENT_BIT)) continue;
@@ -8179,17 +8182,21 @@ static void scene_upscale(Prog *pr, CmdRec *r) {
         float iw = (float)b->width, ih = (float)b->height;
         static const VkComponentMapping id = {0};
         VkImageView in[3] = {vk_image_view(b, VK_IMAGE_VIEW_TYPE_2D, b->format, 0, 1, 0, 1, id, VK_IMAGE_ASPECT_COLOR_BIT)};
-        TexBackend *o = post_image(6, ow, oh, b->format);
-        gp_mark(cb, "scene upscale %ux%u -> %ux%u: %s", b->width, b->height, ow, oh, mode == UPSCALE_SGSR1 ? "sgsr1" : "easu");
-        if (mode == UPSCALE_SGSR1) {
-            float ps[8] = {1.0f / iw, 1.0f / ih, iw, ih, (float)ow, (float)oh};
+        TexBackend *o = post_image(6, dw, dh, b->format);
+        gp_mark(cb, "scene upscale %ux%u -> %ux%u: %s", b->width, b->height, dw, dh,
+                !need_up ? "clearfog" : mode == UPSCALE_SGSR1 ? "sgsr1" : "easu");
+        if (!need_up) {
+            float ps[8] = {(float)dw, (float)dh};
+            post_pass(cb, "clearfog.frag", in, 1, o, ps, false);
+        } else if (mode == UPSCALE_SGSR1) {
+            float ps[8] = {1.0f / iw, 1.0f / ih, iw, ih, (float)dw, (float)dh, g_settings.clear_fog ? 1.0f : 0.0f};
             post_pass(cb, "sgsr1.frag", in, 1, o, ps, false);
         } else {
-            TexBackend *e = post_image(5, ow, oh, b->format);
-            float pe[8] = {iw / ow, ih / oh, 0.5f * iw / ow - 0.5f, 0.5f * ih / oh - 0.5f, iw, ih};
+            TexBackend *e = post_image(5, dw, dh, b->format);
+            float pe[8] = {iw / dw, ih / dh, 0.5f * iw / dw - 0.5f, 0.5f * ih / dh - 0.5f, iw, ih};
             post_pass(cb, "easu.frag", in, 1, e, pe, false);
             gp_mark(cb, "scene upscale: rcas");
-            float pr_[8] = {exp2f(-0.2f), 0, 0, 0, (float)ow, (float)oh};  // (sharpness 0.2 stops: AMD's default)
+            float pr_[8] = {exp2f(-0.2f), g_settings.clear_fog ? 1.0f : 0.0f, 0, 0, (float)dw, (float)dh};
             VkImageView ri[3] = {post_view(e)};
             post_pass(cb, "rcas.frag", ri, 1, o, pr_, false);
         }
@@ -8197,14 +8204,14 @@ static void scene_upscale(Prog *pr, CmdRec *r) {
         scene_up.t = t;
         scene_up.img = o;
         scene_up.view = post_view(o);
-        scene_up.sx = (float)ow / (float)t->width;
-        scene_up.sy = (float)oh / (float)t->height;
+        scene_up.sx = (float)dw / (float)t->width;
+        scene_up.sy = (float)dh / (float)t->height;
         static uint32_t lw, lh, low, loh;
         static int lmode = -1;
-        if (b->width != lw || b->height != lh || ow != low || oh != loh || mode != lmode)
-            LOG("[post] scene %ux%u -> %s %ux%u (format %d)\n", b->width, b->height, mode == UPSCALE_SGSR1 ? "sgsr1" : "fsr1",
-                ow, oh, b->format);
-        lw = b->width; lh = b->height; low = ow; loh = oh; lmode = mode;
+        if (b->width != lw || b->height != lh || dw != low || dh != loh || mode != lmode)
+            LOG("[post] scene %ux%u -> %s %ux%u (format %d)\n", b->width, b->height,
+                !need_up ? "clearfog" : mode == UPSCALE_SGSR1 ? "sgsr1" : "fsr1", dw, dh, b->format);
+        lw = b->width; lh = b->height; low = dw; loh = dh; lmode = mode;
         return;
     }
 }

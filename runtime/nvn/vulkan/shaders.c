@@ -575,6 +575,15 @@ static const char *builtin_src(const char *name, int *stage) {
                "    deltaY = clamp(deltaY, -23.0 / 255.0, 23.0 / 255.0);\n"  // (smooth high contrast input)
                "    color.xyz = clamp(color.xyz + deltaY, 0.0, 1.0);\n"
                "  }\n"
+               "  if (pc.b.z > 0.5) {\n"
+               "    vec3 c = color.xyz;\n"
+               "    float lum = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "    float veil = 0.085 * smoothstep(0.08, 0.45, lum);\n"
+               "    c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\n"
+               "    c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\n"
+               "    float l2 = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "    color.xyz = clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0);\n"
+               "  }\n"
                "  o = vec4(color.xyz, alpha);\n"
                "}\n";
     }
@@ -603,7 +612,34 @@ static const char *builtin_src(const char *name, int *stage) {
                "  vec3 hitMax = (1.0 - max(mx4, e)) / min(4.0 * mn4 - 4.0, vec3(-1.0 / 65536.0));\n"
                "  vec3 lobeRGB = max(-hitMin, hitMax);\n"
                "  float lobe = max(-(0.25 - 1.0 / 16.0), min(max(lobeRGB.r, max(lobeRGB.g, lobeRGB.b)), 0.0)) * pc.a.x * nz;\n"
-               "  o = vec4((lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0), texelFetch(t, ip, 0).a);\n"
+               "  vec3 c = (lobe * (b + d + f + h) + e) / (4.0 * lobe + 1.0);\n"
+               "  if (pc.a.y > 0.5) {\n"
+               "    float lum = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "    float veil = 0.085 * smoothstep(0.08, 0.45, lum);\n"
+               "    c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\n"
+               "    c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\n"
+               "    float l2 = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "    c = clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0);\n"
+               "  }\n"
+               "  o = vec4(c, texelFetch(t, ip, 0).a);\n"
+               "}\n";
+    }
+    if (!strcmp(name, "clearfog.frag")) {
+        *stage = STAGE_FRAGMENT;
+        return "#version 450\n"
+               "layout(set = 0, binding = 0) uniform sampler2D t;\n"
+               "layout(push_constant) uniform P { vec4 a; vec4 b; } pc;\n"
+               "layout(location = 0) out vec4 o;\n"
+               "void main() {\n"
+               "  ivec2 ip = clamp(ivec2(gl_FragCoord.xy), ivec2(0), ivec2(pc.a.xy) - 1);\n"
+               "  vec4 px = texelFetch(t, ip, 0);\n"
+               "  vec3 c = px.rgb;\n"
+               "  float lum = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "  float veil = 0.085 * smoothstep(0.08, 0.45, lum);\n"
+               "  c = clamp((c - veil) / (1.0 - veil), 0.0, 1.0);\n"
+               "  c = mix(c, c * c * (3.0 - 2.0 * c), 0.30);\n"
+               "  float l2 = dot(c, vec3(0.299, 0.587, 0.114));\n"
+               "  o = vec4(clamp(mix(vec3(l2), c, 1.15), 0.0, 1.0), px.a);\n"
                "}\n";
     }
     if (!strcmp(name, "clear.vert")) {

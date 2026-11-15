@@ -1861,7 +1861,7 @@ static VkSampler make_sampler(const NvnSamplerDesc *d, bool compare) {
     si.mipLodBias = d->lod_bias;
 #ifdef __ANDROID__
     if (g_settings.fast_textures) {
-        if (mf > 1) si.mipLodBias += 0.5f;
+        if (mf > 1 && d->max_aniso > 1) si.mipLodBias += 0.5f;
     } else if (d->max_aniso > 1) {
         si.anisotropyEnable = VK_TRUE;
         si.maxAnisotropy = fminf(d->max_aniso, 16);

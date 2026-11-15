@@ -78,6 +78,7 @@ Settings g_settings = {
     .vk_fifo = false,
     .fast_textures = false,
     .dyn_floor_35 = false,
+    .clear_fog = false,
     .out_lines = OUT_AUTO,      // (POCO F7 Ultra, 3200x1440, 1.8.2's Great Plateau: GPU 22.8 ms a frame at the screen's,
                                 // 18.6 at 1080 lines with a larger scene - the final image's passes over 2.2x the pixels)
 #else
@@ -247,6 +248,7 @@ void settings_reset_defaults(void) {
     g_settings.vk_fifo = d->vk_fifo;
     g_settings.fast_textures = d->fast_textures;
     g_settings.dyn_floor_35 = d->dyn_floor_35;
+    g_settings.clear_fog = d->clear_fog;
     g_settings.low_ram = d->low_ram;
     g_settings.native_code = d->native_code;
     g_settings.files_in_place = d->files_in_place;
@@ -306,6 +308,7 @@ void settings_load(void) {
         else if (!strcmp(key, "vk_fifo")) g_settings.vk_fifo = atoi(val) != 0;    
         else if (!strcmp(key, "fast_textures")) g_settings.fast_textures = atoi(val) != 0;
         else if (!strcmp(key, "dyn_floor_35")) g_settings.dyn_floor_35 = atoi(val) != 0;
+        else if (!strcmp(key, "clear_fog")) g_settings.clear_fog = atoi(val) != 0;
         else if (!strcmp(key, "native_code")) g_settings.native_code = atoi(val) != 0;
         else if (!strcmp(key, "files_in_place")) g_settings.files_in_place = atoi(val) != 0;
         else if (!strcmp(key, "gpu_heap")) g_settings.gpu_heap = !strcmp(val, "auto") ? -1 : atoi(val) != 0;
@@ -427,7 +430,7 @@ void settings_save(void) {
 #define TRI(v) tri[(v) < 0 ? 0 : (v) ? 2 : 1]
     fprintf(f, "handheld_mode = %d\ncpu_boost = %d\nvk_fifo = %d\n", g_settings.handheld_mode,
             g_settings.cpu_boost, g_settings.vk_fifo);
-    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35);
+    fprintf(f, "fast_textures = %d\ndyn_floor_35 = %d\nclear_fog = %d\n", g_settings.fast_textures, g_settings.dyn_floor_35, g_settings.clear_fog);
     fprintf(f, "gpu_heap = %s\ninplace_reads = %s\nturnip_lrz = %s\nlog_file = %d\ngpu_model = %s\n", TRI(g_settings.gpu_heap),
             TRI(g_settings.inplace_reads), TRI(g_settings.turnip_lrz), g_settings.log_file, g_settings.gpu_model);
     fprintf(f, "driver_env = %s\nheap_file = %d\n", g_settings.driver_env, g_settings.heap_file);

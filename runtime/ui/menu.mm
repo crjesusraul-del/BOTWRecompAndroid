@@ -782,6 +782,8 @@ static void tab_display(void) {
     opt_toggle("Dynamic Res Floor 35%", &g_settings.dyn_floor_35, false,
                "Allows Dynamic Internal Resolution to scale down to 35% instead of stopping at 50% in heavy areas "
                "to hold 30 fps.");
+    opt_toggle("Clear Fog (No Haze)", &g_settings.clear_fog, false,
+               "Cuts atmospheric fog veil and restores contrast on the 3D scene without affecting HUD or menus.");
     {   // RAM saving (vulkan/exec.c vk_low_ram): read once as the app starts
         void launcher_restart_app(void);  // (ui/launcher.mm)
         static const char *ram[] = {"Automatic", "On", "Off"};  // display order -> low_ram -1 / 1 / 0
