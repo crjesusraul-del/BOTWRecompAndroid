@@ -81,9 +81,14 @@ jobs:
         if: steps.cache-deps.outputs.cache-hit != 'true'
         run: bash android/deps/build_gen_deps.sh
 
-      - name: Setup Gradle
-        uses: gradle/actions/setup-gradle@v4
+      - name: Clean temporary dependency build workspace
+        run: rm -rf android/deps/work
 
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v5
+        with:
+          validate-wrappers: false
+          
       - name: Build Debug APK
         working-directory: android/botwrecompandroid
         run: |
