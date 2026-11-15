@@ -776,6 +776,12 @@ static void tab_display(void) {
     opt_toggle("Vulkan VSync (FIFO)", &g_settings.vk_fifo, false,
                "Off (Mailbox): fastest frame delivery without tearing. On (FIFO): strict VSync queue. "
                "Applies when the app restarts.");
+    opt_toggle("Fast Texture Filtering", &g_settings.fast_textures, false,
+               "Disables anisotropic texture filtering and uses slightly lighter mipmaps to save GPU bandwidth on "
+               "Mali. Applies to new samplers / on game restart.");
+    opt_toggle("Dynamic Res Floor 35%", &g_settings.dyn_floor_35, false,
+               "Allows Dynamic Internal Resolution to scale down to 35% instead of stopping at 50% in heavy areas "
+               "to hold 30 fps.");
     {   // RAM saving (vulkan/exec.c vk_low_ram): read once as the app starts
         void launcher_restart_app(void);  // (ui/launcher.mm)
         static const char *ram[] = {"Automatic", "On", "Off"};  // display order -> low_ram -1 / 1 / 0
